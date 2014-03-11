@@ -1,0 +1,56 @@
+﻿#navigation{
+	width:140px
+}
+
+#navigation table{
+	width:100%
+}
+
+#navigation input{
+	width:100%
+}
+
+#mainTable {
+	border: 1px solid black;
+}
+
+#board{
+	background-color: gray;
+	border: 1px solid gray;
+}
+
+#overlay img {
+	display: inline-block;
+	position: absolute;
+}
+
+#overlay {
+	height: 400px;
+	width: 400px;
+	position: relative;
+	left: 0;
+	top: -405px;
+	margin-bottom: -404px;
+}
+
+.red-text {
+	background-color: red;
+	text-align: center;
+	font-size: 1.2em;
+	color: white;
+}
+
+.black-text {
+	background-color: black;
+	text-align: center;
+	font-size: 1.2em;
+	color: white;
+}
+
+#arrow-overlay {
+	position: relative;
+	left: 0;
+	top: -405px;
+	margin-bottom: -404px;
+	z-index: 100;
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<!--
+  COLLABORATORS: Looked at http://stackoverflow.com/questions/808826/draw-arrow-on-canvas-tag.
+  Other than that no collaborators. 
+  
+-->
+<html>
+
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<title>Checkerboard</title>
+
+<!-- Load style sheets -->
+<link rel="stylesheet" type="text/css" href="mainLayout.css" />
+
+<!-- Load any supplemental Javascript libraries here -->
+<script type="text/javascript" src="external_js/jquery-1.9.0.min.js"></script>
+<script type="text/javascript" src="checker.js"></script>
+<script type="text/javascript" src="boardEvent.js"></script>
+<script type="text/javascript" src="board.js"></script>
+<script type="text/javascript" src="rules.js"></script>
+
+<script type="text/javascript">
+
+//This script extracts parameters from the URL
+//from jquery-howto.blogspot.com
+
+    $.extend({
+        getUrlVars : function() {
+            var vars = [], hash;
+            var hashes = window.location.href.slice(
+                    window.location.href.indexOf('?') + 1).split('&');
+            for ( var i = 0; i < hashes.length; i++) {
+                hash = hashes[i].split('=');
+                vars.push(hash[0]);
+                vars[hash[0]] = hash[1];
+            }
+            return vars;
+        },
+        getUrlVar : function(name) {
+            return $.getUrlVars()[name];
+        }
+    });
+
+    var DEFAULT_BOARD_SIZE = 8;
+
+    //data model
+    var board;
+    var rules;
+    var whoseTurn = "black";	
+
+    var directionOf = function(color) {
+      if (color == "black") {
+        return -1;
+      }
+      return 1;
+    }
+
+    // Fill in this function to toggle the display for whose turn
+    // The color parameter should be either "black" or "red"
+    var toggleTurn = function(color) {
+        if (color == "red") {
+            $("#turn-indicator").text("Black Turn");
+            $("#turn-indicator").removeClass("red-text").addClass("black-text");
+            whoseTurn = "black";
+        } else {
+            $("#turn-indicator").text("Red Turn");
+            $("#turn-indicator").removeClass("black-text").addClass("red-text");
+            whoseTurn = "red";
+        }
+    }
+
+
+
+    // This allows the Javascript code inside this block to only run when the page
+    // has finished loading in the browser.
+    $(document).ready(function() {
+
+        if ($.getUrlVar('size') && $.getUrlVar('size') >= 6) {
+            board = new Board($.getUrlVar('size'));
+        } else {
+            board = new Board(DEFAULT_BOARD_SIZE);
+        }
+
+
+	    rules = new Rules(board);
+
+        var c = document.getElementById("board");
+        var ctx = c.getContext("2d");
+        var white = false;
+        for (var col=0;col<board.size();col++) {
+            white = !white;
+            for (var row=0;row<board.size();row++) {
+                if (white) {
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect((400/board.size())*row,(400/board.size())*col,400/board.size(),400/board.size());
+                    white = false;
+                } else {
+                    white = true;
+                }
+            }
+        }
+
+        board.addEventListener('add',function (e) {
+    		updateCheckers();
+    	},true);
+
+    	board.addEventListener('move',function (e) {
+    		updateCheckers();
+    	},true);
+
+        board.addEventListener('remove', function (e) {
+            updateCheckers();
+        }, true);
+
+        board.addEventListener('promote',function (e) {
+    		updateCheckers();
+    	},true);
+
+        
+        $("#btnNewGame").click(function(evt) {
+            board.prepareNewGame();
+            updateCheckers();
+            clearArrow();
+        });
+
+        $("#btnAutoMove").click(function(evt) {
+          var playerColor = whoseTurn;
+          var playerDirection = directionOf(playerColor);
+          var result = rules.makeRandomMove(playerColor, playerDirection);
+          if (result != null) {
+            toggleTurn(playerColor);
+            drawArrow(result);
+          }
+        });
+
+        board.prepareNewGame();
+
+        // repaints all of the checkers
+        // this flickers on repaint--working on fix
+        function updateCheckers() {
+            $("#overlay").empty();
+            var checkers = board.getAllCheckers();
+            var size = 400/board.size();
+            for (var i in checkers) {
+                if (checkers[i].isKing) {
+                    var type = "king.png";
+                } else {
+                    var type = "piece.png"
+                }
+                $("#overlay").append("<img src=\"graphics/" + checkers[i].color + "-" + type + "\" alt=\"red\" height=\"" + size + "\" width=\"" + size + "\" style=\"top:" + size*checkers[i].row + "px;left:" + size*checkers[i].col + "px;\">");
+            }
+        };
+
+
+        // draws the arrow from old loc to new, takes the result of a move operation
+        function drawArrow(result) {
+            var c = document.getElementById("arrows");
+            var ctx = c.getContext("2d");
+            var size = 400/board.size();
+
+            clearArrow();
+
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+
+            // calculate for the center
+            from_x = (result['from_col'] * size) + size/2; 
+            from_y = (result['from_row'] * size) + size/2;
+            to_x = (result['to_col'] * size) + size/2;
+            to_y = (result['to_row'] * size) + size/2;
+
+            var headlength = 12;
+
+            var angle_rad = Math.atan2(to_y-from_y, to_x-from_x); // angle from center of old pos to new
+            ctx.moveTo(from_x, from_y); // start at center of old
+            ctx.lineTo(to_x, to_y); // line to center of new
+            ctx.lineTo(to_x-headlength*Math.cos(angle_rad-Math.PI/6), to_y-headlength*Math.sin(angle_rad-Math.PI/6)); //top right line of arrow
+            ctx.lineTo(to_x-headlength*Math.cos(angle_rad+Math.PI/6), to_y-headlength*Math.sin(angle_rad+Math.PI/6)); // top left line of arrow
+            ctx.lineTo(to_x, to_y);
+            ctx.strokeStyle = '#ffff00';
+            ctx.stroke();
+        };
+
+        // This will clear the entire arrow canvas
+        function clearArrow() {
+            var c = document.getElementById("arrows");
+            var ctx = c.getContext("2d");
+            ctx.clearRect(0,0,400,400);
+        }
+    });
+</script>
+
+
+</head>
+
+<body>
+
+<table id="mainTable">
+    <tr>
+        <td id="navigation">
+          <table>
+			  <tr><td><div id="turn-indicator" class="black-text">Black Turn</div></td></tr>
+              <tr><td><input id="btnNewGame" type="button" name="new" value="New Game"/></td></tr>
+              <tr><td><input id="btnAutoMove" type="button" name="new" value="Auto Move"/></td></tr>
+
+            </table>
+        </td>
+
+        <td id="content">
+            <canvas id="board" width="400" height="400"></canvas>
+            <div id="overlay"></div>
+            <div id="arrow-overlay">
+                <canvas id="arrows" width="400" height="400"></canvas>
+            </div>
+            
+        </td>
+    </tr>
+
+   </table>
+
+</body>
+
+</html>
