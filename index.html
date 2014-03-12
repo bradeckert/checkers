@@ -164,6 +164,8 @@
 
             ctx.beginPath();
             ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffff00';
+            ctx.fillStyle = '#ffff00';
 
             // calculate for the center
             from_x = (result['from_col'] * size) + size/2; 
@@ -173,13 +175,20 @@
 
             var headlength = 12;
 
-            var angle_rad = Math.atan2(to_y-from_y, to_x-from_x); // angle from center of old pos to new
+            // draw line
             ctx.moveTo(from_x, from_y); // start at center of old
             ctx.lineTo(to_x, to_y); // line to center of new
+            ctx.closePath();
+            ctx.stroke();
+
+            // draw arrow head
+            var angle_rad = Math.atan2(to_y-from_y, to_x-from_x); // angle from center of old pos to new
+            ctx.beginPath();
+            ctx.moveTo(to_x, to_y);
             ctx.lineTo(to_x-headlength*Math.cos(angle_rad-Math.PI/6), to_y-headlength*Math.sin(angle_rad-Math.PI/6)); //top right line of arrow
             ctx.lineTo(to_x-headlength*Math.cos(angle_rad+Math.PI/6), to_y-headlength*Math.sin(angle_rad+Math.PI/6)); // top left line of arrow
-            ctx.lineTo(to_x, to_y);
-            ctx.strokeStyle = '#ffff00';
+            ctx.closePath();
+            ctx.fill();
             ctx.stroke();
         };
 

@@ -12,6 +12,9 @@
 
 #mainTable {
 	border: 1px solid black;
+	width: 552px;
+	height: auto;
+	margin: 10px auto;
 }
 
 #board{
