@@ -104,25 +104,43 @@
 
         board.addEventListener('add',function (e) {
     		updateCheckers();
+            reattachListeners();
     	},true);
 
     	board.addEventListener('move',function (e) {
     		updateCheckers();
+            reattachListeners();
     	},true);
 
         board.addEventListener('remove', function (e) {
             updateCheckers();
+            reattachListeners();
         }, true);
 
         board.addEventListener('promote',function (e) {
     		updateCheckers();
+            reattachListeners();
     	},true);
 
+        var move_history = new Array();
+        var move_level = 0;
         
+
         $("#btnNewGame").click(function(evt) {
+            // make sure always starts with black turn
+            if (whoseTurn == "red") {
+                toggleTurn(whoseTurn);
+            }
             board.prepareNewGame();
             updateCheckers();
+            reattachListeners();
             clearArrow();
+
+            // reset the undo/redo stack
+            move_history = new Array();
+            move_level = 0;
+           $("#btnUndoMove").attr('disabled', 'disabled');
+           $("#btnRedoMove").attr('disabled', 'disabled');
         });
 
         $("#btnAutoMove").click(function(evt) {
@@ -132,8 +150,68 @@
           if (result != null) {
             toggleTurn(playerColor);
             drawArrow(result);
+            // remove anything past the new move on the stack
+            move_history = move_history.slice(0, move_level);
+            move_history.push(result);
+            move_level++;
+           $("#btnUndoMove").removeAttr('disabled');
           }
         });
+
+        $("#btnUndoMove").click(function(e) {
+            // if we have any moves left to be undone
+            if (move_level > 0) {
+                to_undo = move_history[move_level-1];
+                move_level--;
+                var checker = board.getCheckerAt(to_undo.to_row, to_undo.to_col);
+
+                if (checker != null) {
+                    board.moveTo(checker, to_undo.from_row, to_undo.from_col);
+                    drawArrow({from_row: to_undo.to_row, from_col: to_undo.to_col, to_row: to_undo.from_row, to_col: to_undo.from_col});
+                }
+
+                // unmake king
+                if (to_undo.made_king) {
+                    checker.isKing = false;
+                }
+
+                // add back in removed pieces
+                if (to_undo.remove.length > 0) {
+                    board.add(to_undo.remove[0], to_undo.remove[0].row, to_undo.remove[0].col);
+                }
+                $("#btnRedoMove").removeAttr('disabled');
+            }
+            if (move_level == 0) {
+               $("#btnUndoMove").attr('disabled', 'disabled');
+            }
+        });
+
+        $("#btnRedoMove").click(function(e) {
+            // there are moves to be redone
+            if (move_level < move_history.length) {
+                to_redo = move_history[move_level];
+                var checker = board.getCheckerAt(to_redo.from_row, to_redo.from_col);
+                board.moveTo(checker, to_redo.to_row, to_redo.to_col);
+                drawArrow({from_row: to_redo.from_row, from_col: to_redo.from_col, to_row: to_redo.to_row, to_col: to_redo.to_col});
+                move_level++;
+                
+                // re-remove pieces that were added back
+                if (to_redo.remove.length > 0) {
+                        board.remove(to_undo.remove[0], to_undo.remove[0].row, to_undo.remove[0].col);
+                }
+
+                // remake king
+                if (to_redo.made_king) {
+                        checker.isKing = true;
+                }
+                $("#btnUndoMove").removeAttr('disabled');
+            }
+            if (move_level >= move_history.length) {
+                $("#btnRedoMove").attr('disabled', 'disabled');
+            }
+        });
+
+
 
         board.prepareNewGame();
 
@@ -149,9 +227,96 @@
                 } else {
                     var type = "piece.png"
                 }
-                $("#overlay").append("<img src=\"graphics/" + checkers[i].color + "-" + type + "\" alt=\"red\" height=\"" + size + "\" width=\"" + size + "\" style=\"top:" + size*checkers[i].row + "px;left:" + size*checkers[i].col + "px;\">");
-            }
+                var piece = document.createElement('img');
+                piece.setAttribute('src', 'graphics/' + checkers[i].color + '-' + type);
+                piece.setAttribute('alt', type);
+                piece.setAttribute('height', size);
+                piece.setAttribute('width', size);
+                piece.setAttribute('class', 'piece');
+                piece.style.left=size*checkers[i].col + 'px';
+                piece.style.top=size*checkers[i].row + 'px';
+                $("#overlay").append(piece);
+            };
         };
+
+
+        // when the pieces are redrawn, this reattaches the listeners
+        // also hold the dragging logic
+        function reattachListeners() {
+            // if a drag is underway
+            var onDragg = false;
+            // item being dragged
+            var dragging = null;
+
+            var absolute_pos = $("#overlay").offset();
+            var startLoc = null;
+            var size = 400/board.size();
+
+            // mousedown record
+            $(".piece").mousedown(function(e_down) {
+                e_down.preventDefault();
+                dragging = e_down.target;
+                onDragg = true;
+                startLoc = {x: e_down.pageX - absolute_pos.left, y: e_down.pageY - absolute_pos.top};
+                e_down.target.style.zIndex='500';
+            });
+            
+            // mousemove have the piece follow mouse
+            $('html').mousemove(function(e_move) {
+                if (onDragg) {
+                    e_move.preventDefault();
+                    dragging.style.left=e_move.pageX - absolute_pos.left - size/2 + 'px';
+                    dragging.style.top=e_move.pageY - absolute_pos.top - size/2 + 'px';
+                }
+            });
+
+            // mouseup checks if in a valid location, otherwise sends home
+            $('html').mouseup(function(e_up) {
+                if (onDragg) {
+                    e_up.preventDefault();
+                    onDragg = false;
+                    e_up.target.style.zIndex='10';
+
+                    var start_row = Math.floor(startLoc.y/size);
+                    var start_col = Math.floor(startLoc.x/size);
+                    var endLoc = {x: e_up.pageX - absolute_pos.left, y: e_up.pageY - absolute_pos.top};
+                    var end_row = Math.floor(endLoc.y/size);
+                    var end_col = Math.floor(endLoc.x/size);
+
+                    // check if in a valid square
+                    if (board.isEmptyLocation(end_row, end_col) && end_col < board.size() && end_row < board.size() && end_col >= 0 && end_row >= 0) {
+                        var checker = board.getCheckerAt(start_row, start_col);
+                        var playerColor = whoseTurn;
+                        var playerDirection = directionOf(playerColor);
+                        var result = rules.makeMove(checker, directionOf(playerColor), playerDirection, end_row, end_col);
+                        if (result != null) {
+                            toggleTurn(playerColor);
+                            drawArrow(result);
+                            move_history = move_history.slice(0, move_level);
+                            move_history.push(result);
+                            move_level++;
+                            $("#btnUndoMove").removeAttr('disabled');
+                        } else {
+                            dragging = null;
+                            e_up.target.style.left=size*start_col + 'px';
+                            e_up.target.style.top=size*start_row + 'px';
+                        }
+                    } else {
+                        //deal with case put on invalid spot
+                        dragging.style.left=size*start_col + 'px';
+                        dragging.style.top=size*start_row + 'px';
+                        dragging = null;
+                    }
+
+                    dragging = null;
+                }
+            });
+            
+        };
+      
+
+
+
 
 
         // draws the arrow from old loc to new, takes the result of a move operation
@@ -213,6 +378,8 @@
 			  <tr><td><div id="turn-indicator" class="black-text">Black Turn</div></td></tr>
               <tr><td><input id="btnNewGame" type="button" name="new" value="New Game"/></td></tr>
               <tr><td><input id="btnAutoMove" type="button" name="new" value="Auto Move"/></td></tr>
+              <tr><td><input id="btnUndoMove" type="button" name="new" value="Undo Move" disabled="disabled"/></td></tr>
+              <tr><td><input id="btnRedoMove" type="button" name="new" value="Redo Move" disabled="disabled"/></td></tr>
 
             </table>
         </td>
